@@ -19,6 +19,8 @@ A developer sample application built with Angular that demonstrates melody gener
 - [Usage](#usage)
 - [Resonance Effects and Hydi Integration](#resonance-effects-and-hydi-integration)
 - [DAW Architecture](#daw-architecture)
+- [Advanced Components](#advanced-components)
+- [Testing](#testing)
 - [Dependencies](#dependencies)
 - [Contributing](#contributing)
 - [License](#license)
@@ -60,6 +62,21 @@ Before running this application, ensure you have the following installed:
 2. **Gemini API Key**
    - Visit Google AI Studio: https://aistudio.google.com/
    - Click "Get API Key" to obtain your API key
+
+3. **Rezonate System Files (Optional but Recommended)**
+   - The application will work without these files but with reduced functionality
+   - **Main Core File**: `Rezonate_Core.zip` (preferred) or alternatives:
+     - `Rezonate_Bootstrap.zip`
+     - `Resonate.zip`
+     - `Rezonette_Sys.zip.7z`
+   - **Additional Files**:
+     - `Hydi_Core_Rebuild_With_Launcher.zip`
+     - `Rezonette_LocalNFT_Minter.zip` (optional)
+     - `Rezonette_SampleManager_Waveform.zip` (optional)
+     - `Rezonette_Studio_Assistant_GUI_Audio_Visualizer.zip` (optional)
+   - Place files in `/public/assets/rezonate/` directory
+   - The system automatically detects alternative filenames
+   - Missing files will be detected automatically with setup instructions provided
 
 ## Installation
 
@@ -186,6 +203,93 @@ We welcome contributions to this project! Please see our [Contributing Guideline
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+## Advanced Components
+
+### MIDI Pattern Generator
+- **Drum Patterns**: Generate rhythmic patterns with varying complexity
+- **Bass Patterns**: Create walking bass lines and groove patterns
+- **Chord Patterns**: Generate harmonic progressions and arpeggios
+- **Lead Patterns**: Create melodic lines and solos
+- **Style Adaptation**: Patterns adapt to different musical styles and tempos
+
+### Lyrics Generator
+- **AI-Powered Lyrics**: Generate lyrics using advanced language models
+- **Structured Composition**: Verse/chorus/bridge structure with rhyme schemes
+- **Mood-Based Content**: Lyrics adapt to specified emotional context
+- **Syllable Control**: Maintain proper rhythm and syllable count
+
+### Voice Synthesis
+- **Text-to-Speech**: Convert lyrics to natural-sounding speech
+- **Singing Voice**: Generate melodic vocal performances
+- **Voice Selection**: Multiple voice options (male/female/neutral)
+- **Emotional Expression**: Adjust emotional tone and delivery
+
+### Song Idea Generator
+- **Complete Concepts**: Generate full song ideas with titles and chord progressions
+- **Style Matching**: Adapt to different musical genres and moods
+- **Chord Progressions**: Create harmonically rich progressions
+- **Metadata Generation**: Include tempo, key, and instrumentation suggestions
+
+### Model Track Visualizer
+- **Piano Roll View**: Traditional MIDI note visualization
+- **Waveform Display**: Audio waveform with amplitude analysis
+- **Spectrogram Analysis**: Frequency content over time
+- **Pattern Heatmaps**: Visual representation of musical patterns
+- **Real-time Rendering**: Canvas-based visualization system
+
+### Session Recorder
+- **Action Logging**: Record all user interactions and parameter changes
+- **Snapshot System**: Periodic state snapshots for analysis
+- **Analytics Engine**: Generate insights about user workflow
+- **Performance Metrics**: Track productivity and feature usage
+
+### Sound Pack Pipeline
+- **Pattern Extraction**: Analyze session data for reusable patterns
+- **Automated Packaging**: Create organized sound packs from patterns
+- **Quality Assessment**: Evaluate pattern quality and novelty
+- **Publishing System**: Deploy packs to cloud storage
+
+### Firebase Integration
+- **User Authentication**: Secure user management and profiles
+- **Project Storage**: Cloud-based project persistence
+- **Session Sync**: Real-time collaboration features
+- **Asset Management**: File upload and organization
+- **Analytics Dashboard**: Usage statistics and insights
+
+## Testing
+
+The project includes comprehensive verification tests covering all major components:
+
+### Test Coverage
+- **Rezonate Core**: Resonance and Hydi effects functionality
+- **Lyrics Generator**: AI-powered lyric generation and validation
+- **Voice Synthesis**: Text-to-speech and singing voice synthesis
+- **MIDI Pattern Generator**: Pattern generation across all instrument types
+- **Song Idea Generator**: Complete song concept generation
+- **Model Track Visualizer**: Audio visualization and analysis
+- **Session Recorder**: Action logging and analytics
+- **Sound Pack Pipeline**: Automated content creation
+- **Integration Tests**: End-to-end workflow validation
+
+### Running Tests
+```bash
+# Run the complete test suite
+npm run test:comprehensive
+
+# Run specific component tests
+npm run test:rezonate
+npm run test:lyrics
+npm run test:voice
+npm run test:midi
+```
+
+### Test Results
+The verification suite provides detailed reporting on:
+- Test pass/fail status
+- Performance metrics
+- Error diagnostics
+- Integration validation
 
 ## API Key Privacy
 

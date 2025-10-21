@@ -15,6 +15,10 @@ import { DAWProjectManager } from './daw-project-manager';
 import { DAWSynthesizer } from './daw-synthesizer';
 import { RezonateControlsComponent } from './rezonate-controls';
 import { KeyboardComponent } from './keyboard.component';
+import { dawFileLoader } from './daw-file-loader';
+import { ThemeService } from './theming/theme.service';
+import { SessionGoalsService, SessionGoal } from './session-goals.service';
+import { SessionGoalsComponent } from './session-goals.component';
 
 @Component({
   selector: 'app-daw-main',
@@ -26,7 +30,8 @@ import { KeyboardComponent } from './keyboard.component';
     DAWTimelineComponent,
     DAWTransportComponent,
     RezonateControlsComponent,
-    KeyboardComponent
+    KeyboardComponent,
+    SessionGoalsComponent
   ],
   template: `
     <div class="daw-main">
@@ -52,6 +57,13 @@ import { KeyboardComponent } from './keyboard.component';
         <div class="toolbar-section">
           <button class="toolbar-btn" [disabled]="!canUndo" (click)="undo()">Undo</button>
           <button class="toolbar-btn" [disabled]="!canRedo" (click)="redo()">Redo</button>
+        </div>
+
+        <div class="toolbar-section">
+          <label for="theme-select" class="theme-label">Theme:</label>
+          <select id="theme-select" class="theme-select" [(ngModel)]="selectedTheme" (change)="onThemeChange()">
+            <option *ngFor="let theme of themes" [value]="theme.value">{{ theme.name }}</option>
+          </select>
         </div>
       </div>
 
@@ -105,8 +117,11 @@ import { KeyboardComponent } from './keyboard.component';
           </app-daw-timeline>
         </div>
 
-        <!-- Right Panel - Effects & Keyboard -->
+        <!-- Right Panel - Effects, Keyboard & Goals -->
         <div class="right-panel">
+          <div class="session-goals-panel">
+              <app-session-goals></app-session-goals>
+          </div>
           <div class="effects-panel">
             <h4>Rezonate Effects</h4>
             <app-rezonate-controls
@@ -138,13 +153,18 @@ import { KeyboardComponent } from './keyboard.component';
       </div>
     </div>
   `,
+  styleUrls: ['./theming/themes.scss'],
   styles: [`
+    :host {
+      --accent-color-modified: #ff6b6b;
+    }
+
     .daw-main {
       display: flex;
       flex-direction: column;
       height: 100vh;
-      background: #1a1a1a;
-      color: #fff;
+      background: var(--background-color);
+      color: var(--text-color);
       font-family: Arial, sans-serif;
     }
 
@@ -153,8 +173,8 @@ import { KeyboardComponent } from './keyboard.component';
       justify-content: space-between;
       align-items: center;
       padding: 8px 16px;
-      background: #2a2a2a;
-      border-bottom: 1px solid #444;
+      background: var(--secondary-color);
+      border-bottom: 1px solid var(--border-color);
       flex-wrap: wrap;
       gap: 16px;
     }
@@ -166,9 +186,9 @@ import { KeyboardComponent } from './keyboard.component';
     }
 
     .toolbar-btn {
-      background: #444;
+      background: var(--button-bg-color);
       border: none;
-      color: white;
+      color: var(--button-text-color);
       padding: 6px 12px;
       border-radius: 4px;
       cursor: pointer;
@@ -176,23 +196,37 @@ import { KeyboardComponent } from './keyboard.component';
     }
 
     .toolbar-btn:hover {
-      background: #555;
+      filter: brightness(1.1);
     }
 
     .toolbar-btn:disabled {
-      background: #333;
-      color: #666;
+      background: var(--secondary-color);
+      color: var(--text-color);
+      opacity: 0.5;
       cursor: not-allowed;
     }
 
     .project-name {
       font-weight: bold;
-      color: #fff;
+      color: var(--text-color);
     }
 
     .modified-indicator {
-      color: #ff6b6b;
+      color: var(--accent-color-modified);
       font-weight: bold;
+    }
+
+    .theme-label {
+        font-size: 0.9em;
+        color: var(--text-color);
+    }
+
+    .theme-select {
+        background: var(--input-bg-color);
+        color: var(--input-text-color);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 4px;
     }
 
     .daw-content {
@@ -203,32 +237,39 @@ import { KeyboardComponent } from './keyboard.component';
 
     .left-panel {
       width: 300px;
-      border-right: 1px solid #333;
-      background: #222;
+      border-right: 1px solid var(--border-color);
+      background: var(--control-bg-color);
       overflow-y: auto;
     }
 
     .center-panel {
       flex: 1;
-      background: #1a1a1a;
+      background: var(--background-color);
       overflow: hidden;
     }
 
     .right-panel {
       width: 350px;
-      border-left: 1px solid #333;
-      background: #222;
+      border-left: 1px solid var(--border-color);
+      background: var(--control-bg-color);
       padding: 16px;
       overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .session-goals-panel {
+        flex-shrink: 0;
     }
 
     .effects-panel, .keyboard-panel {
-      margin-bottom: 20px;
+      margin-bottom: 0;
     }
 
     .effects-panel h4, .keyboard-panel h4 {
       margin: 0 0 12px 0;
-      color: #fff;
+      color: var(--text-color);
       font-size: 1em;
     }
 
@@ -237,10 +278,11 @@ import { KeyboardComponent } from './keyboard.component';
       justify-content: space-between;
       align-items: center;
       padding: 4px 16px;
-      background: #2a2a2a;
-      border-top: 1px solid #444;
+      background: var(--secondary-color);
+      border-top: 1px solid var(--border-color);
       font-size: 0.8em;
-      color: #ccc;
+      color: var(--text-color);
+      opacity: 0.8;
     }
 
     .status-item {
@@ -248,7 +290,7 @@ import { KeyboardComponent } from './keyboard.component';
     }
 
     h4 {
-      color: #fff;
+      color: var(--text-color);
       margin-bottom: 8px;
     }
   `]
@@ -288,30 +330,69 @@ export class DAWMainComponent implements OnInit, OnDestroy {
   canRedo = false;
   activeVoices = 0;
 
-  ngOnInit() {
-    // Initialize DAW components
-    this.dawEngine = new DAWEngine();
-    this.projectManager = new DAWProjectManager(this.dawEngine);
-    this.synthesizer = new DAWSynthesizer(
-      this.dawEngine.getAudioContext(),
-      this.dawEngine.getRezonateCore()
-    );
+  // Theming
+  themes = [
+    { name: 'Dark', value: 'dark-theme' },
+    { name: 'Light', value: 'light-theme' },
+    { name: 'Solarized Dark', value: 'solarized-dark-theme' }
+  ];
+  selectedTheme: string;
 
-    // Create default project
-    this.newProject();
+  constructor(private themeService: ThemeService, private goalsService: SessionGoalsService) {
+    this.selectedTheme = this.themeService.getCurrentTheme();
+  }
 
-    // Setup transport callbacks
-    this.dawEngine.addTransportCallback((time) => {
-      this.currentTime = time;
-    });
+  async ngOnInit() {
+    this.themeService.initializeTheme();
+    this.initializeGoals();
 
-    // Start auto-save
-    this.projectManager.startAutoSave();
+    try {
+      // Initialize file loader and check for required files
+      console.log('Loading Rezonate system files...');
+      const fileLoadResult = await dawFileLoader.initialize();
+
+      if (!fileLoadResult.success) {
+        console.warn('Some required files are missing. System will operate with reduced functionality.');
+        console.log(dawFileLoader.generateSetupInstructions());
+
+        // Show user-friendly warning
+        this.showFileWarning(fileLoadResult);
+      }
+
+      // Initialize DAW components
+      this.dawEngine = new DAWEngine();
+      this.projectManager = new DAWProjectManager(this.dawEngine);
+      this.synthesizer = new DAWSynthesizer(
+        this.dawEngine.getAudioContext(),
+        this.dawEngine.getRezonateCore()
+      );
+
+      // Create default project
+      this.newProject();
+
+      // Setup transport callbacks
+      this.dawEngine.addTransportCallback((time) => {
+        this.currentTime = time;
+      });
+
+      // Start auto-save
+      this.projectManager.startAutoSave();
+
+      console.log('DAW initialization complete');
+    } catch (error) {
+      console.error('Failed to initialize DAW:', error);
+      // Continue with basic functionality
+      this.initializeFallbackMode();
+    }
   }
 
   ngOnDestroy() {
     this.dawEngine.getAudioContext().close();
     this.projectManager.dispose();
+  }
+
+  onThemeChange() {
+      this.themeService.setTheme(this.selectedTheme);
   }
 
   // Project Management
@@ -320,6 +401,7 @@ export class DAWMainComponent implements OnInit, OnDestroy {
     this.projectName = project.name;
     this.updateTracks();
     this.isModified = false;
+    this.initializeGoals(); // Reset goals for the new project
   }
 
   openProject() {
@@ -336,6 +418,7 @@ export class DAWMainComponent implements OnInit, OnDestroy {
               this.projectName = session.metadata.name;
               this.updateTracks();
               this.isModified = false;
+              this.initializeGoals(); // Re-evaluate goals for loaded project
             }
           }
         });
@@ -496,12 +579,69 @@ export class DAWMainComponent implements OnInit, OnDestroy {
     }
   }
 
+  // Session Goals
+  private initializeGoals() {
+    const initialGoals: SessionGoal[] = [
+      {
+        id: 'goal-1',
+        title: 'Lay Down the Foundation',
+        description: 'Create at least 4 tracks to build your song's structure.',
+        metric: 'track_count',
+        target: 4,
+        progress: 0,
+        status: 'incomplete',
+        isMandatory: true
+      },
+      {
+        id: 'goal-2',
+        title: 'Write a Chorus',
+        description: 'A great song needs a catchy chorus. Write at least 4 lines.',
+        metric: 'chorus_lines',
+        target: 4,
+        progress: 0,
+        status: 'incomplete',
+        isMandatory: true
+      },
+      {
+        id: 'goal-3',
+        title: 'Add a Verse',
+        description: 'Every story needs a beginning. Write a verse for your song.',
+        metric: 'has_verse',
+        target: 1,
+        progress: 0,
+        status: 'incomplete',
+        isMandatory: false
+      },
+      {
+        id: 'goal-4',
+        title: 'Define the Harmony',
+        description: 'Add a chord progression to establish the song\'s mood.',
+        metric: 'has_chords',
+        target: 1,
+        progress: 0,
+        status: 'incomplete',
+        isMandatory: true
+      }
+    ];
+    this.goalsService.loadGoals(initialGoals);
+    this.evaluateGoals();
+  }
+
+  private evaluateGoals() {
+      const dawState = {
+          tracks: this.tracks
+          // In the future, we would also pass lyrics, chord progressions, etc.
+      };
+      this.goalsService.evaluateGoals(dawState);
+  }
+
   // Private Methods
   private updateTracks() {
     this.tracks = this.dawEngine.getTracks();
     this.canUndo = this.projectManager.canUndo();
     this.canRedo = this.projectManager.canRedo();
     this.activeVoices = this.synthesizer.getActiveVoices();
+    this.evaluateGoals();
   }
 
   private markModified() {
@@ -518,5 +658,31 @@ export class DAWMainComponent implements OnInit, OnDestroy {
 
   private getTotalClips(): number {
     return this.tracks.reduce((total, track) => total + track.clips.length, 0);
+  }
+
+  // File loading helpers
+  private showFileWarning(result: any): void {
+    const missingCount = result.missingFiles?.length || 0;
+    if (missingCount > 0) {
+      console.warn(`Warning: ${missingCount} required Rezonate files are missing. Some features may not work properly.`);
+      console.log('Missing files:', result.missingFiles);
+    }
+  }
+
+  private initializeFallbackMode(): void {
+    console.log('Initializing fallback mode with basic functionality...');
+
+    // Initialize with basic components only
+    try {
+      this.dawEngine = new DAWEngine();
+      this.projectManager = new DAWProjectManager(this.dawEngine);
+
+      // Create basic project without synthesizer
+      this.newProject();
+
+      console.log('Fallback mode initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize fallback mode:', error);
+    }
   }
 }

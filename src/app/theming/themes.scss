@@ -1,0 +1,65 @@
+
+// Base variables that will be overridden by themes.
+// These default to the dark theme values.
+:root {
+  --background-color: #2c2c2e;
+  --text-color: #ffffff;
+  --primary-color: #0a84ff;
+  --secondary-color: #3a3a3c;
+  --accent-color: #ff9f0a;
+  --border-color: #444446;
+  --control-bg-color: #1c1c1e;
+  --control-fg-color: #e5e5e7;
+  --input-bg-color: #3a3a3c;
+  --input-text-color: #ffffff;
+  --button-bg-color: #5a5a5c;
+  --button-text-color: #ffffff;
+}
+
+// Light Theme
+.light-theme {
+  --background-color: #f2f2f7;
+  --text-color: #000000;
+  --primary-color: #007aff;
+  --secondary-color: #e5e5ea;
+  --accent-color: #ff9500;
+  --border-color: #c6c6c8;
+  --control-bg-color: #ffffff;
+  --control-fg-color: #3d3d3d;
+  --input-bg-color: #e5e5ea;
+  --input-text-color: #000000;
+  --button-bg-color: #d1d1d6;
+  --button-text-color: #000000;
+}
+
+// Dark Theme
+.dark-theme {
+  --background-color: #1c1c1e;
+  --text-color: #ffffff;
+  --primary-color: #0a84ff;
+  --secondary-color: #3a3a3c;
+  --accent-color: #ff9f0a;
+  --border-color: #444446;
+  --control-bg-color: #2c2c2e;
+  --control-fg-color: #e5e5e7;
+  --input-bg-color: #3a3a3c;
+  --input-text-color: #ffffff;
+  --button-bg-color: #5a5a5c;
+  --button-text-color: #ffffff;
+}
+
+// Solarized Dark Theme
+.solarized-dark-theme {
+    --background-color: #002b36;
+    --text-color: #839496;
+    --primary-color: #268bd2;
+    --secondary-color: #073642;
+    --accent-color: #b58900;
+    --border-color: #586e75;
+    --control-bg-color: #001f29;
+    --control-fg-color: #93a1a1;
+    --input-bg-color: #073642;
+    --input-text-color: #93a1a1;
+    --button-bg-color: #586e75;
+    --button-text-color: #fdf6e3;
+}
