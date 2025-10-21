@@ -20,6 +20,7 @@ import { ThemeService } from './theming/theme.service';
 import { SessionGoalsService, SessionGoal } from './session-goals.service';
 import { SessionGoalsComponent } from './session-goals.component';
 import { ProjectRoadmapComponent } from './project-roadmap.component';
+import { TrackTemplateVisualizerComponent } from './track-template-visualizer.component';
 
 @Component({
   selector: 'app-daw-main',
@@ -33,7 +34,8 @@ import { ProjectRoadmapComponent } from './project-roadmap.component';
     RezonateControlsComponent,
     KeyboardComponent,
     SessionGoalsComponent,
-    ProjectRoadmapComponent
+    ProjectRoadmapComponent,
+    TrackTemplateVisualizerComponent
   ],
   template: `
     <div class="daw-main">
@@ -121,11 +123,14 @@ import { ProjectRoadmapComponent } from './project-roadmap.component';
 
         <!-- Right Panel - Effects, Keyboard & Goals -->
         <div class="right-panel">
-            <div class="project-roadmap-panel">
-                <app-project-roadmap></app-project-roadmap>
-            </div>
+          <div class="project-roadmap-panel">
+            <app-project-roadmap></app-project-roadmap>
+          </div>
+          <div class="track-template-panel">
+            <app-track-template-visualizer></app-track-template-visualizer>
+          </div>
           <div class="session-goals-panel">
-              <app-session-goals></app-session-goals>
+            <app-session-goals></app-session-goals>
           </div>
           <div class="effects-panel">
             <h4>Rezonate Effects</h4>
@@ -264,7 +269,7 @@ import { ProjectRoadmapComponent } from './project-roadmap.component';
       gap: 20px;
     }
     
-    .project-roadmap-panel, .session-goals-panel {
+    .project-roadmap-panel, .track-template-panel, .session-goals-panel {
         flex-shrink: 0;
     }
 
