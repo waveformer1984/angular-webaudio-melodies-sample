@@ -22,6 +22,7 @@ import { SessionGoalsComponent } from './session-goals.component';
 import { ProjectRoadmapComponent } from './project-roadmap.component';
 import { TrackTemplateVisualizerComponent } from './track-template-visualizer.component';
 import { SamplerComponent } from './sampler.component';
+import { UpdateTrackCommand } from './daw-commands';
 
 @Component({
   selector: 'app-daw-main',
@@ -361,6 +362,7 @@ export class DAWMainComponent implements OnInit, OnDestroy {
     ) {
     this.selectedTheme = this.themeService.getCurrentTheme();
     this.dawEngine = this.dawEngineInstance;
+    this.projectManager = new DAWProjectManager(this.dawEngine);
   }
 
   async ngOnInit() {
@@ -381,7 +383,6 @@ export class DAWMainComponent implements OnInit, OnDestroy {
       }
 
       // Initialize DAW components
-      this.projectManager = new DAWProjectManager(this.dawEngine);
       this.synthesizer = new DAWSynthesizer(
         this.dawEngine.getAudioContext(),
         this.dawEngine.getRezonateCore()
@@ -533,9 +534,17 @@ export class DAWMainComponent implements OnInit, OnDestroy {
 
   // Track Operations
   onTrackUpdate(update: {trackId: string, updates: Partial<Track>}) {
-    this.dawEngine.updateTrack(update.trackId, update.updates);
+    const track = this.dawEngine.getTrack(update.trackId);
+    if (!track) return;
+
+    const oldProperties: Partial<Track> = {};
+    for (const key in update.updates) {
+      oldProperties[key as keyof Track] = track[key as keyof Track];
+    }
+
+    const command = new UpdateTrackCommand(this.dawEngine, update.trackId, oldProperties, update.updates);
+    this.projectManager.executeCommand(command);
     this.updateTracks();
-    this.markModified();
   }
 
   onMasterVolumeChange(volume: number) {
@@ -588,15 +597,13 @@ export class DAWMainComponent implements OnInit, OnDestroy {
 
   // Undo/Redo
   undo() {
-    if (this.projectManager.undo()) {
-      this.updateTracks();
-    }
+    this.projectManager.undo();
+    this.updateTracks();
   }
 
   redo() {
-    if (this.projectManager.redo()) {
-      this.updateTracks();
-    }
+    this.projectManager.redo();
+    this.updateTracks();
   }
 
   // Session Goals
@@ -660,6 +667,7 @@ export class DAWMainComponent implements OnInit, OnDestroy {
     this.tracks = this.dawEngine.getTracks();
     this.canUndo = this.projectManager.canUndo();
     this.canRedo = this.projectManager.canRedo();
+    this.isModified = this.projectManager.isModified();
     this.activeVoices = this.synthesizer.getActiveVoices();
     this.evaluateGoals();
   }
