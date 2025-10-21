@@ -22,7 +22,7 @@ import { SessionGoalsComponent } from './session-goals.component';
 import { ProjectRoadmapComponent } from './project-roadmap.component';
 import { TrackTemplateVisualizerComponent } from './track-template-visualizer.component';
 import { SamplerComponent } from './sampler.component';
-import { UpdateTrackCommand } from './daw-commands';
+import { AddTrackCommand, DeleteTrackCommand, UpdateTrackCommand } from './daw-commands';
 
 @Component({
   selector: 'app-daw-main',
@@ -40,7 +40,7 @@ import { UpdateTrackCommand } from './daw-commands';
     TrackTemplateVisualizerComponent,
     SamplerComponent
   ],
-  providers: [DAWEngine], // Provide DAWEngine here
+  providers: [DAWEngine],
   template: `
     <div class="daw-main">
       <!-- Top Toolbar -->
@@ -106,6 +106,7 @@ import { UpdateTrackCommand } from './daw-commands';
             [tracks]="tracks"
             [masterVolume]="masterVolume"
             (trackUpdate)="onTrackUpdate($event)"
+            (trackDelete)="deleteTrack($event)"
             (masterVolumeChange)="onMasterVolumeChange($event)"
             (addEffectToTrack)="onAddEffect($event)">
           </app-daw-mixer>
@@ -127,7 +128,7 @@ import { UpdateTrackCommand } from './daw-commands';
 
         <!-- Right Panel - Effects, Keyboard & Goals -->
         <div class="right-panel">
-          <div class="project-roadmap-panel">
+           <div class="project-roadmap-panel">
             <app-project-roadmap></app-project-roadmap>
           </div>
           <div class="track-template-panel">
@@ -358,8 +359,8 @@ export class DAWMainComponent implements OnInit, OnDestroy {
   constructor(
     private themeService: ThemeService, 
     private goalsService: SessionGoalsService,
-    private dawEngineInstance: DAWEngine // Inject DAWEngine
-    ) {
+    private dawEngineInstance: DAWEngine
+  ) {
     this.selectedTheme = this.themeService.getCurrentTheme();
     this.dawEngine = this.dawEngineInstance;
     this.projectManager = new DAWProjectManager(this.dawEngine);
@@ -370,39 +371,30 @@ export class DAWMainComponent implements OnInit, OnDestroy {
     this.initializeGoals();
 
     try {
-      // Initialize file loader and check for required files
       console.log('Loading Rezonate system files...');
       const fileLoadResult = await dawFileLoader.initialize();
 
       if (!fileLoadResult.success) {
-        console.warn('Some required files are missing. System will operate with reduced functionality.');
-        console.log(dawFileLoader.generateSetupInstructions());
-
-        // Show user-friendly warning
+        console.warn('Some required files are missing.');
         this.showFileWarning(fileLoadResult);
       }
 
-      // Initialize DAW components
       this.synthesizer = new DAWSynthesizer(
         this.dawEngine.getAudioContext(),
         this.dawEngine.getRezonateCore()
       );
 
-      // Create default project
       this.newProject();
 
-      // Setup transport callbacks
       this.dawEngine.addTransportCallback((time) => {
         this.currentTime = time;
       });
 
-      // Start auto-save
       this.projectManager.startAutoSave();
 
       console.log('DAW initialization complete');
     } catch (error) {
       console.error('Failed to initialize DAW:', error);
-      // Continue with basic functionality
       this.initializeFallbackMode();
     }
   }
@@ -413,7 +405,7 @@ export class DAWMainComponent implements OnInit, OnDestroy {
   }
 
   onThemeChange() {
-      this.themeService.setTheme(this.selectedTheme);
+    this.themeService.setTheme(this.selectedTheme);
   }
 
   // Project Management
@@ -421,8 +413,6 @@ export class DAWMainComponent implements OnInit, OnDestroy {
     const project = this.projectManager.createNewProject('New Project');
     this.projectName = project.name;
     this.updateTracks();
-    this.isModified = false;
-    this.initializeGoals(); // Reset goals for the new project
   }
 
   openProject() {
@@ -438,8 +428,7 @@ export class DAWMainComponent implements OnInit, OnDestroy {
             if (session) {
               this.projectName = session.metadata.name;
               this.updateTracks();
-              this.isModified = false;
-              this.initializeGoals(); // Re-evaluate goals for loaded project
+              this.initializeGoals();
             }
           }
         });
@@ -450,87 +439,45 @@ export class DAWMainComponent implements OnInit, OnDestroy {
 
   saveProject() {
     this.projectManager.saveProject();
-    this.isModified = false;
   }
 
   onFileSelected(event: Event) {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (file) {
-      this.projectManager.loadProject(file);
+    if (input.files?.[0]) {
+      this.projectManager.loadProject(input.files[0]);
     }
   }
 
   // Track Management
   addAudioTrack() {
-    this.dawEngine.createTrack(`Audio Track ${this.tracks.length + 1}`, 'audio');
+    const command = new AddTrackCommand(this.dawEngine, `Audio Track ${this.tracks.length + 1}`, 'audio');
+    this.projectManager.executeCommand(command);
     this.updateTracks();
-    this.markModified();
   }
 
   addMidiTrack() {
-    this.dawEngine.createTrack(`MIDI Track ${this.tracks.length + 1}`, 'midi');
+    const command = new AddTrackCommand(this.dawEngine, `MIDI Track ${this.tracks.length + 1}`, 'midi');
+    this.projectManager.executeCommand(command);
     this.updateTracks();
-    this.markModified();
+  }
+
+  deleteTrack(trackId: string) {
+    const command = new DeleteTrackCommand(this.dawEngine, trackId);
+    this.projectManager.executeCommand(command);
+    this.updateTracks();
   }
 
   // Transport Controls
-  onPlay() {
-    this.dawEngine.play();
-    this.isPlaying = true;
-  }
-
-  onPause() {
-    this.dawEngine.pause();
-    this.isPlaying = false;
-  }
-
-  onStop() {
-    this.dawEngine.stop();
-    this.isPlaying = false;
-    this.currentTime = 0;
-  }
-
-  onRecord() {
-    this.isRecording = !this.isRecording;
-    // Implementation for recording would go here
-  }
-
-  onTimeChange(time: number) {
-    this.dawEngine.setPosition(time);
-    this.currentTime = time;
-  }
-
-  onBpmChange(bpm: number) {
-    this.bpm = bpm;
-    // Update project BPM
-    const project = this.dawEngine.getProject();
-    if (project) {
-      project.bpm = bpm;
-      this.markModified();
-    }
-  }
-
-  onLoopToggle(enabled: boolean) {
-    this.loopEnabled = enabled;
-    if (!enabled) {
-      this.dawEngine.setLoop(0, 0);
-    }
-  }
-
-  onLoopPointsChange(points: {start: number, end: number}) {
-    this.loopStart = points.start;
-    this.loopEnd = points.end;
-    this.dawEngine.setLoop(points.start, points.end);
-  }
-
-  onMetronomeToggle(enabled: boolean) {
-    this.metronomeEnabled = enabled;
-  }
-
-  onTimeSignatureChange(signature: string) {
-    this.timeSignature = signature;
-  }
+  onPlay() { this.dawEngine.play(); this.isPlaying = true; }
+  onPause() { this.dawEngine.pause(); this.isPlaying = false; }
+  onStop() { this.dawEngine.stop(); this.isPlaying = false; this.currentTime = 0; }
+  onRecord() { this.isRecording = !this.isRecording; }
+  onTimeChange(time: number) { this.dawEngine.setPosition(time); this.currentTime = time; }
+  onBpmChange(bpm: number) { this.bpm = bpm; if (this.dawEngine.getProject()) this.dawEngine.getProject()!.bpm = bpm; this.markModified(); }
+  onLoopToggle(enabled: boolean) { this.loopEnabled = enabled; if (!enabled) this.dawEngine.setLoop(0, 0); }
+  onLoopPointsChange(points: {start: number, end: number}) { this.loopStart = points.start; this.loopEnd = points.end; this.dawEngine.setLoop(points.start, points.end); }
+  onMetronomeToggle(enabled: boolean) { this.metronomeEnabled = enabled; }
+  onTimeSignatureChange(signature: string) { this.timeSignature = signature; }
 
   // Track Operations
   onTrackUpdate(update: {trackId: string, updates: Partial<Track>}) {
@@ -539,7 +486,9 @@ export class DAWMainComponent implements OnInit, OnDestroy {
 
     const oldProperties: Partial<Track> = {};
     for (const key in update.updates) {
-      oldProperties[key as keyof Track] = track[key as keyof Track];
+        if (Object.prototype.hasOwnProperty.call(track, key)) {
+            oldProperties[key as keyof Track] = track[key as keyof Track];
+        }
     }
 
     const command = new UpdateTrackCommand(this.dawEngine, update.trackId, oldProperties, update.updates);
@@ -547,53 +496,19 @@ export class DAWMainComponent implements OnInit, OnDestroy {
     this.updateTracks();
   }
 
-  onMasterVolumeChange(volume: number) {
-    this.masterVolume = volume;
-    // Apply to master output
-  }
-
-  onAddEffect(trackId: string) {
-    // Implementation for adding effects to tracks
-    console.log('Add effect to track:', trackId);
-  }
+  onMasterVolumeChange(volume: number) { this.masterVolume = volume; }
+  onAddEffect(trackId: string) { console.log('Add effect to track:', trackId); }
 
   // Timeline Operations
-  onClipMove(move: {clip: Clip, newStartTime: number}) {
-    // Update clip position
-    this.markModified();
-  }
-
-  onClipResize(resize: {clip: Clip, newDuration: number, edge: 'left' | 'right'}) {
-    // Update clip duration
-    this.markModified();
-  }
-
-  onPlayheadMove(time: number) {
-    this.dawEngine.setPosition(time);
-    this.currentTime = time;
-  }
-
-  onZoomChange(zoom: number) {
-    this.timelineZoom = zoom;
-  }
+  onClipMove(move: {clip: Clip, newStartTime: number}) { this.markModified(); }
+  onClipResize(resize: {clip: Clip, newDuration: number, edge: 'left' | 'right'}) { this.markModified(); }
+  onPlayheadMove(time: number) { this.dawEngine.setPosition(time); this.currentTime = time; }
+  onZoomChange(zoom: number) { this.timelineZoom = zoom; }
 
   // Rezonate Controls
-  onResonanceToggle(enabled: boolean) {
-    this.resonanceEnabled = enabled;
-    this.dawEngine.getRezonateCore().setResonanceEnabled(enabled);
-  }
-
-  onHydiToggle(config: any) {
-    this.hydiEnabled = config.enabled;
-    this.hydiIntensity = config.intensity;
-    this.hydiModulationRate = config.modulationRate;
-    this.dawEngine.getRezonateCore().enableHydi(config);
-  }
-
-  onRezonateGainChange(gain: number) {
-    this.rezonateGain = gain;
-    this.dawEngine.getRezonateCore().setMasterGain(gain);
-  }
+  onResonanceToggle(enabled: boolean) { this.resonanceEnabled = enabled; this.dawEngine.getRezonateCore().setResonanceEnabled(enabled); }
+  onHydiToggle(config: any) { this.hydiEnabled = config.enabled; this.hydiIntensity = config.intensity; this.hydiModulationRate = config.modulationRate; this.dawEngine.getRezonateCore().enableHydi(config); }
+  onRezonateGainChange(gain: number) { this.rezonateGain = gain; this.dawEngine.getRezonateCore().setMasterGain(gain); }
 
   // Undo/Redo
   undo() {
@@ -609,57 +524,18 @@ export class DAWMainComponent implements OnInit, OnDestroy {
   // Session Goals
   private initializeGoals() {
     const initialGoals: SessionGoal[] = [
-      {
-        id: 'goal-1',
-        title: 'Lay Down the Foundation',
-        description: 'Create at least 4 tracks to build your song's structure.',
-        metric: 'track_count',
-        target: 4,
-        progress: 0,
-        status: 'incomplete',
-        isMandatory: true
-      },
-      {
-        id: 'goal-2',
-        title: 'Write a Chorus',
-        description: 'A great song needs a catchy chorus. Write at least 4 lines.',
-        metric: 'chorus_lines',
-        target: 4,
-        progress: 0,
-        status: 'incomplete',
-        isMandatory: true
-      },
-      {
-        id: 'goal-3',
-        title: 'Add a Verse',
-        description: 'Every story needs a beginning. Write a verse for your song.',
-        metric: 'has_verse',
-        target: 1,
-        progress: 0,
-        status: 'incomplete',
-        isMandatory: false
-      },
-      {
-        id: 'goal-4',
-        title: 'Define the Harmony',
-        description: 'Add a chord progression to establish the song\'s mood.',
-        metric: 'has_chords',
-        target: 1,
-        progress: 0,
-        status: 'incomplete',
-        isMandatory: true
-      }
+      { id: 'goal-1', title: 'Lay Down the Foundation', description: 'Create at least 4 tracks.', metric: 'track_count', target: 4, progress: 0, status: 'incomplete', isMandatory: true },
+      { id: 'goal-2', title: 'Write a Chorus', description: 'Write at least 4 lines.', metric: 'chorus_lines', target: 4, progress: 0, status: 'incomplete', isMandatory: true },
+      { id: 'goal-3', title: 'Add a Verse', description: 'Write a verse for your song.', metric: 'has_verse', target: 1, progress: 0, status: 'incomplete', isMandatory: false },
+      { id: 'goal-4', title: 'Define the Harmony', description: 'Add a chord progression.', metric: 'has_chords', target: 1, progress: 0, status: 'incomplete', isMandatory: true }
     ];
     this.goalsService.loadGoals(initialGoals);
     this.evaluateGoals();
   }
 
   private evaluateGoals() {
-      const dawState = {
-          tracks: this.tracks
-          // In the future, we would also pass lyrics, chord progressions, etc.
-      };
-      this.goalsService.evaluateGoals(dawState);
+    const dawState = { tracks: this.tracks };
+    this.goalsService.evaluateGoals(dawState);
   }
 
   // Private Methods
@@ -668,13 +544,15 @@ export class DAWMainComponent implements OnInit, OnDestroy {
     this.canUndo = this.projectManager.canUndo();
     this.canRedo = this.projectManager.canRedo();
     this.isModified = this.projectManager.isModified();
-    this.activeVoices = this.synthesizer.getActiveVoices();
+    if (this.synthesizer) {
+        this.activeVoices = this.synthesizer.getActiveVoices();
+    }
     this.evaluateGoals();
   }
 
   private markModified() {
-    this.isModified = true;
     this.projectManager.markAsModified();
+    this.isModified = this.projectManager.isModified();
   }
 
   private formatTime(seconds: number): string {
@@ -688,26 +566,16 @@ export class DAWMainComponent implements OnInit, OnDestroy {
     return this.tracks.reduce((total, track) => total + track.clips.length, 0);
   }
 
-  // File loading helpers
   private showFileWarning(result: any): void {
-    const missingCount = result.missingFiles?.length || 0;
-    if (missingCount > 0) {
-      console.warn(`Warning: ${missingCount} required Rezonate files are missing. Some features may not work properly.`);
-      console.log('Missing files:', result.missingFiles);
+    if (result.missingFiles?.length > 0) {
+      console.warn(`Warning: ${result.missingFiles.length} required files are missing.`);
     }
   }
 
   private initializeFallbackMode(): void {
-    console.log('Initializing fallback mode with basic functionality...');
-
-    // Initialize with basic components only
+    console.log('Initializing fallback mode...');
     try {
-      this.projectManager = new DAWProjectManager(this.dawEngine);
-
-      // Create basic project without synthesizer
       this.newProject();
-
-      console.log('Fallback mode initialized successfully');
     } catch (error) {
       console.error('Failed to initialize fallback mode:', error);
     }
