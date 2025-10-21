@@ -47,6 +47,29 @@ export interface FilterConfig {
   gain: number;
 }
 
+export interface LFOConfig {
+  rate: number;
+  depth: number;
+  waveform: OscillatorType;
+  enabled: boolean;
+}
+
+export interface ModulationTarget {
+  parameter: string;
+  amount: number;
+  lfoIndex: number;
+}
+
+export interface SynthPreset {
+  name: string;
+  oscillators: OscillatorConfig[];
+  filter: FilterConfig;
+  envelope: Envelope;
+  lfos: LFOConfig[];
+  modulationMatrix: ModulationTarget[];
+  effects: any[];
+}
+
 export class DAWSynthesizer {
   private audioContext: AudioContext;
   private rezonateCore: RezonateCore;
@@ -54,6 +77,8 @@ export class DAWSynthesizer {
   private masterGain: GainNode;
   private activePreset: SynthPreset;
   private polyphony = 8;
+  private lfos: OscillatorNode[] = [];
+  private lfoGains: GainNode[] = [];
 
   // Built-in presets
   private static readonly presets: SynthPreset[] = [
@@ -65,6 +90,8 @@ export class DAWSynthesizer {
       ],
       filter: { type: 'lowpass', frequency: 1000, Q: 1, gain: 0 },
       envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.3 },
+      lfos: [],
+      modulationMatrix: [],
       effects: []
     },
     {
@@ -76,6 +103,8 @@ export class DAWSynthesizer {
       ],
       filter: { type: 'lowpass', frequency: 800, Q: 2, gain: 0 },
       envelope: { attack: 0.5, decay: 0.3, sustain: 0.7, release: 1.0 },
+      lfos: [],
+      modulationMatrix: [],
       effects: []
     },
     {
@@ -86,6 +115,8 @@ export class DAWSynthesizer {
       ],
       filter: { type: 'lowpass', frequency: 1200, Q: 1.5, gain: 0 },
       envelope: { attack: 0.1, decay: 0.2, sustain: 0.9, release: 0.4 },
+      lfos: [],
+      modulationMatrix: [],
       effects: []
     }
   ];
@@ -99,6 +130,9 @@ export class DAWSynthesizer {
 
     // Load default preset
     this.activePreset = DAWSynthesizer.presets[0];
+
+    // Initialize LFOs
+    this.initializeLFOs();
   }
 
   // Note triggering
@@ -241,6 +275,7 @@ export class DAWSynthesizer {
     if (!preset) return false;
 
     this.activePreset = { ...preset };
+    this.applyModulationMatrix();
     return true;
   }
 
@@ -302,11 +337,110 @@ export class DAWSynthesizer {
     return this.masterGain.gain.value;
   }
 
+  // LFO System
+  private initializeLFOs(): void {
+    // Create up to 4 LFOs
+    for (let i = 0; i < 4; i++) {
+      const lfo = this.audioContext.createOscillator();
+      const lfoGain = this.audioContext.createGain();
+
+      lfo.frequency.value = 1; // Default 1 Hz
+      lfoGain.gain.value = 0; // Default no modulation
+
+      lfo.connect(lfoGain);
+      lfo.start();
+
+      this.lfos.push(lfo);
+      this.lfoGains.push(lfoGain);
+    }
+  }
+
+  private applyModulationMatrix(): void {
+    // Disconnect existing modulation connections
+    this.lfoGains.forEach(gain => {
+      gain.disconnect();
+    });
+
+    // Apply modulation matrix
+    this.activePreset.modulationMatrix.forEach(target => {
+      if (target.lfoIndex < this.lfoGains.length) {
+        const lfoGain = this.lfoGains[target.lfoIndex];
+
+        switch (target.parameter) {
+          case 'oscillator_frequency':
+            // Connect to oscillator frequency modulation
+            this.voices.forEach(voice => {
+              voice.oscillators.forEach(osc => {
+                lfoGain.connect(osc.frequency);
+              });
+            });
+            break;
+          case 'filter_frequency':
+            // Connect to filter frequency modulation
+            this.voices.forEach(voice => {
+              lfoGain.connect(voice.filter.frequency);
+            });
+            break;
+          case 'gain':
+            // Connect to gain modulation
+            this.voices.forEach(voice => {
+              lfoGain.connect(voice.gainNode.gain);
+            });
+            break;
+        }
+
+        lfoGain.gain.value = target.amount;
+      }
+    });
+  }
+
+  // LFO Configuration Methods
+  setLFOConfig(index: number, config: Partial<LFOConfig>): void {
+    if (index >= this.activePreset.lfos.length) return;
+
+    Object.assign(this.activePreset.lfos[index], config);
+
+    // Update actual LFO
+    if (index < this.lfos.length) {
+      const lfo = this.lfos[index];
+      const lfoGain = this.lfoGains[index];
+
+      if (config.rate !== undefined) lfo.frequency.value = config.rate;
+      if (config.waveform !== undefined) lfo.type = config.waveform;
+      if (config.enabled !== undefined) {
+        lfoGain.gain.value = config.enabled ? config.depth || 0 : 0;
+      }
+    }
+
+    this.applyModulationMatrix();
+  }
+
+  addModulationTarget(target: ModulationTarget): void {
+    this.activePreset.modulationMatrix.push(target);
+    this.applyModulationMatrix();
+  }
+
+  removeModulationTarget(index: number): void {
+    if (index < this.activePreset.modulationMatrix.length) {
+      this.activePreset.modulationMatrix.splice(index, 1);
+      this.applyModulationMatrix();
+    }
+  }
+
   // Cleanup
   dispose(): void {
     // Stop all voices
     this.voices.forEach(voice => {
       this.cleanupVoice(voice.id);
+    });
+
+    // Stop LFOs
+    this.lfos.forEach(lfo => {
+      try {
+        lfo.stop();
+      } catch (e) {
+        // LFO might already be stopped
+      }
     });
 
     this.masterGain.disconnect();
