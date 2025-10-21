@@ -14,6 +14,7 @@ import { DAWTransportComponent } from './daw-transport';
 import { DAWProjectManager } from './daw-project-manager';
 import { DAWSynthesizer } from './daw-synthesizer';
 import { RezonateControlsComponent } from './rezonate-controls';
+import { RezonateControls } from './rezonate-controls';
 import { KeyboardComponent } from './keyboard.component';
 import { dawFileLoader } from './daw-file-loader';
 import { ThemeService } from './theming/theme.service';
@@ -152,6 +153,20 @@ import { AddTrackCommand, DeleteTrackCommand, UpdateTrackCommand } from './daw-c
               (hydiToggle)="onHydiToggle($event)"
               (masterGainChange)="onRezonateGainChange($event)">
             </app-rezonate-controls>
+            <div class="preset-controls">
+              <div class="preset-group">
+                <label for="resonance-preset">Resonance Preset:</label>
+                <select id="resonance-preset" (change)="onResonancePresetChange($event)">
+                  <option *ngFor="let preset of resonancePresets" [value]="preset">{{ preset }}</option>
+                </select>
+              </div>
+              <div class="preset-group">
+                <label for="hydi-preset">Hydi Preset:</label>
+                <select id="hydi-preset" (change)="onHydiPresetChange($event)">
+                  <option *ngFor="let preset of hydiPresets" [value]="preset">{{ preset }}</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <div class="keyboard-panel">
@@ -318,6 +333,7 @@ export class DAWMainComponent implements OnInit, OnDestroy {
   private dawEngine: DAWEngine;
   private projectManager: DAWProjectManager;
   private synthesizer: DAWSynthesizer;
+  private rezonateControls: RezonateControls;
 
   // UI State
   tracks: Track[] = [];
@@ -340,6 +356,8 @@ export class DAWMainComponent implements OnInit, OnDestroy {
   rezonateGain = 0.3;
   hydiIntensity = 0.5;
   hydiModulationRate = 0.1;
+  resonancePresets = ['Warm', 'Bright', 'Mellow'];
+  hydiPresets = ['Gentle', 'Intense', 'Ethereal'];
 
   // Project State
   projectName = 'Untitled Project';
@@ -364,6 +382,7 @@ export class DAWMainComponent implements OnInit, OnDestroy {
     this.selectedTheme = this.themeService.getCurrentTheme();
     this.dawEngine = this.dawEngineInstance;
     this.projectManager = new DAWProjectManager(this.dawEngine);
+    this.rezonateControls = new RezonateControls(this.dawEngine.getRezonateCore());
   }
 
   async ngOnInit() {
@@ -509,6 +528,15 @@ export class DAWMainComponent implements OnInit, OnDestroy {
   onResonanceToggle(enabled: boolean) { this.resonanceEnabled = enabled; this.dawEngine.getRezonateCore().setResonanceEnabled(enabled); }
   onHydiToggle(config: any) { this.hydiEnabled = config.enabled; this.hydiIntensity = config.intensity; this.hydiModulationRate = config.modulationRate; this.dawEngine.getRezonateCore().enableHydi(config); }
   onRezonateGainChange(gain: number) { this.rezonateGain = gain; this.dawEngine.getRezonateCore().setMasterGain(gain); }
+  onResonancePresetChange(event: Event) {
+    const preset = (event.target as HTMLSelectElement).value as 'Warm' | 'Bright' | 'Mellow';
+    this.rezonateControls.applyResonancePreset(preset);
+  }
+
+  onHydiPresetChange(event: Event) {
+    const preset = (event.target as HTMLSelectElement).value as 'Gentle' | 'Intense' | 'Ethereal';
+    this.rezonateControls.applyHydiPreset(preset);
+  }
 
   // Undo/Redo
   undo() {
