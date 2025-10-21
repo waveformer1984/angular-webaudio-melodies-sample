@@ -19,13 +19,20 @@ export interface RoadmapSection {
       <div class="roadmap-visualizer">
         <div *ngFor="let section of roadmap" 
              class="roadmap-section" 
+             [class.selected]="section === selectedSection"
              [style.width.%]="getSectionWidth(section)" 
-             [style.background-color]="getSectionColor(section.title)">
-          {{ section.title }}
+             [style.background-color]="getSectionColor(section.title)"
+             (click)="onSectionClick(section)">
+          <span>{{ section.title }}</span>
         </div>
-        <svg class="energy-curve" width="100%" height="100%">
-          <path [attr.d]="getEnergyCurvePath()" fill="none" stroke="var(--accent-color, #ff9f0a)" stroke-width="2"></path>
+        <svg class="energy-curve" width="100%" height="100%" preserveAspectRatio="none">
+          <path [attr.d]="energyCurvePath" fill="none" stroke="var(--accent-color, #ff9f0a)" stroke-width="2"></path>
         </svg>
+      </div>
+      <div *ngIf="selectedSection" class="roadmap-inspector">
+        <h4>Selected: {{ selectedSection.title }}</h4>
+        <p>Energy Level: {{ selectedSection.energy.toFixed(1) }}</p>
+        <button (click)="promptAI()">Ask AI for Suggestions</button>
       </div>
     </div>
   `,
@@ -35,12 +42,10 @@ export interface RoadmapSection {
       padding: 16px;
       border-radius: 8px;
     }
-
     h2 {
       color: var(--text-color, #fff);
       margin-bottom: 16px;
     }
-
     .roadmap-visualizer {
       position: relative;
       display: flex;
@@ -49,8 +54,8 @@ export interface RoadmapSection {
       border: 1px solid var(--border-color, #444);
       border-radius: 4px;
       overflow: hidden;
+      margin-bottom: 16px;
     }
-
     .roadmap-section {
       display: flex;
       align-items: center;
@@ -60,18 +65,52 @@ export interface RoadmapSection {
       font-weight: bold;
       text-transform: uppercase;
       border-right: 1px solid var(--border-color, #444);
+      cursor: pointer;
+      transition: filter 0.2s, border 0.2s;
+      z-index: 1;
     }
-
+    .roadmap-section:hover {
+      filter: brightness(1.2);
+    }
+    .roadmap-section.selected {
+      border: 2px solid var(--accent-color, #ff9f0a);
+      filter: brightness(1.3);
+      z-index: 2;
+    }
+    .roadmap-section span {
+        pointer-events: none;
+    }
     .energy-curve {
       position: absolute;
       top: 0;
       left: 0;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .roadmap-inspector {
+      color: var(--text-color, #fff);
+      background-color: var(--secondary-color, #3a3a3c);
+      padding: 12px;
+      border-radius: 4px;
+    }
+    .roadmap-inspector h4 {
+        margin-top: 0;
+    }
+    .roadmap-inspector button {
+      background: var(--button-bg-color, #5a5a5c);
+      color: var(--button-text-color, #fff);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 6px 12px;
     }
   `]
 })
 export class ProjectRoadmapComponent implements OnInit {
   roadmap: RoadmapSection[] = [];
   totalDuration = 0;
+  selectedSection: RoadmapSection | null = null;
+  energyCurvePath = '';
 
   constructor() { }
 
@@ -87,6 +126,18 @@ export class ProjectRoadmapComponent implements OnInit {
       { id: '8', title: 'Outro', startTime: 180, endTime: 200, energy: 0.1 },
     ];
     this.totalDuration = this.roadmap[this.roadmap.length - 1].endTime;
+    this.energyCurvePath = this.createCardinalSpline(this.getEnergyPoints());
+  }
+
+  onSectionClick(section: RoadmapSection) {
+    this.selectedSection = section;
+  }
+
+  promptAI() {
+    if (!this.selectedSection) return;
+    const prompt = `I've selected the ${this.selectedSection.title} section of my song. It runs from ${this.selectedSection.startTime}s to ${this.selectedSection.endTime}s and has a current energy level of ${this.selectedSection.energy.toFixed(1)}. I'm looking for suggestions to improve it. What kind of instrumentation, harmony, or rhythm changes could I make?`;
+    console.log("PROMPT FOR AI:", prompt);
+    // In a future step, this will be connected to the bot chat service.
   }
 
   getSectionWidth(section: RoadmapSection): number {
@@ -104,23 +155,36 @@ export class ProjectRoadmapComponent implements OnInit {
     return colors[title] || '#8a8a8a';
   }
 
-  getEnergyCurvePath(): string {
-    if (this.roadmap.length === 0) {
-      return '';
+  private getEnergyPoints(): [number, number][] {
+    const points: [number, number][] = [];
+    this.roadmap.forEach(section => {
+        const x = ((section.startTime + (section.endTime - section.startTime) / 2) / this.totalDuration) * 100;
+        const y = 100 - (section.energy * 90) - 5; // Scale energy to fit within 90% of height with 5% padding
+        points.push([x, y]);
+    });
+    return points;
+  }
+
+  private createCardinalSpline(points: [number, number][], tension = 0.5): string {
+    if (points.length < 2) return '';
+
+    let path = `M ${points[0][0]},${points[0][1]}`;
+
+    for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i > 0 ? i - 1 : 0];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+
+        const cp1_x = p1[0] + (p2[0] - p0[0]) / 6 * tension;
+        const cp1_y = p1[1] + (p2[1] - p0[1]) / 6 * tension;
+
+        const cp2_x = p2[0] - (p3[0] - p1[0]) / 6 * tension;
+        const cp2_y = p2[1] - (p3[1] - p1[1]) / 6 * tension;
+
+        path += ` C ${cp1_x},${cp1_y} ${cp2_x},${cp2_y} ${p2[0]},${p2[1]}`;
     }
 
-    const pathParts = this.roadmap.map((section, index) => {
-      const x = (section.startTime / this.totalDuration) * 100;
-      const y = 100 - (section.energy * 100);
-      return (index === 0 ? 'M' : 'L') + `${x},${y}`;
-    });
-
-    // Add a point for the end of the last section
-    const lastSection = this.roadmap[this.roadmap.length - 1];
-    const endX = (lastSection.endTime / this.totalDuration) * 100;
-    const endY = 100 - (lastSection.energy * 100);
-    pathParts.push(`L${endX},${endY}`);
-
-    return pathParts.join(' ');
+    return path;
   }
 }
