@@ -19,6 +19,7 @@ import { dawFileLoader } from './daw-file-loader';
 import { ThemeService } from './theming/theme.service';
 import { SessionGoalsService, SessionGoal } from './session-goals.service';
 import { SessionGoalsComponent } from './session-goals.component';
+import { ProjectRoadmapComponent } from './project-roadmap.component';
 
 @Component({
   selector: 'app-daw-main',
@@ -31,7 +32,8 @@ import { SessionGoalsComponent } from './session-goals.component';
     DAWTransportComponent,
     RezonateControlsComponent,
     KeyboardComponent,
-    SessionGoalsComponent
+    SessionGoalsComponent,
+    ProjectRoadmapComponent
   ],
   template: `
     <div class="daw-main">
@@ -119,6 +121,9 @@ import { SessionGoalsComponent } from './session-goals.component';
 
         <!-- Right Panel - Effects, Keyboard & Goals -->
         <div class="right-panel">
+            <div class="project-roadmap-panel">
+                <app-project-roadmap></app-project-roadmap>
+            </div>
           <div class="session-goals-panel">
               <app-session-goals></app-session-goals>
           </div>
@@ -259,7 +264,7 @@ import { SessionGoalsComponent } from './session-goals.component';
       gap: 20px;
     }
     
-    .session-goals-panel {
+    .project-roadmap-panel, .session-goals-panel {
         flex-shrink: 0;
     }
 
