@@ -21,6 +21,7 @@ import { SessionGoalsService, SessionGoal } from './session-goals.service';
 import { SessionGoalsComponent } from './session-goals.component';
 import { ProjectRoadmapComponent } from './project-roadmap.component';
 import { TrackTemplateVisualizerComponent } from './track-template-visualizer.component';
+import { SamplerComponent } from './sampler.component';
 
 @Component({
   selector: 'app-daw-main',
@@ -35,8 +36,10 @@ import { TrackTemplateVisualizerComponent } from './track-template-visualizer.co
     KeyboardComponent,
     SessionGoalsComponent,
     ProjectRoadmapComponent,
-    TrackTemplateVisualizerComponent
+    TrackTemplateVisualizerComponent,
+    SamplerComponent
   ],
+  providers: [DAWEngine], // Provide DAWEngine here
   template: `
     <div class="daw-main">
       <!-- Top Toolbar -->
@@ -128,6 +131,9 @@ import { TrackTemplateVisualizerComponent } from './track-template-visualizer.co
           </div>
           <div class="track-template-panel">
             <app-track-template-visualizer></app-track-template-visualizer>
+          </div>
+          <div class="sampler-panel-container">
+            <app-sampler></app-sampler>
           </div>
           <div class="session-goals-panel">
             <app-session-goals></app-session-goals>
@@ -269,7 +275,7 @@ import { TrackTemplateVisualizerComponent } from './track-template-visualizer.co
       gap: 20px;
     }
     
-    .project-roadmap-panel, .track-template-panel, .session-goals-panel {
+    .project-roadmap-panel, .track-template-panel, .sampler-panel-container, .session-goals-panel {
         flex-shrink: 0;
     }
 
@@ -348,8 +354,13 @@ export class DAWMainComponent implements OnInit, OnDestroy {
   ];
   selectedTheme: string;
 
-  constructor(private themeService: ThemeService, private goalsService: SessionGoalsService) {
+  constructor(
+    private themeService: ThemeService, 
+    private goalsService: SessionGoalsService,
+    private dawEngineInstance: DAWEngine // Inject DAWEngine
+    ) {
     this.selectedTheme = this.themeService.getCurrentTheme();
+    this.dawEngine = this.dawEngineInstance;
   }
 
   async ngOnInit() {
@@ -370,7 +381,6 @@ export class DAWMainComponent implements OnInit, OnDestroy {
       }
 
       // Initialize DAW components
-      this.dawEngine = new DAWEngine();
       this.projectManager = new DAWProjectManager(this.dawEngine);
       this.synthesizer = new DAWSynthesizer(
         this.dawEngine.getAudioContext(),
@@ -684,7 +694,6 @@ export class DAWMainComponent implements OnInit, OnDestroy {
 
     // Initialize with basic components only
     try {
-      this.dawEngine = new DAWEngine();
       this.projectManager = new DAWProjectManager(this.dawEngine);
 
       // Create basic project without synthesizer
