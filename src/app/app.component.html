@@ -1,0 +1,15 @@
+<div class="daw-container">
+  <div class="transport">
+    <button (click)="play()">Play</button>
+    <button (click)="pause()">Pause</button>
+    <button (click)="stop()">Stop</button>
+  </div>
+  <div class="tracks">
+    <div *ngFor="let track of tracks" class="track">
+      <div class="track-header">
+        <span>{{ track.name }}</span>
+      </div>
+    </div>
+  </div>
+  <button (click)="createTrack()">Create Track</button>
+</div>

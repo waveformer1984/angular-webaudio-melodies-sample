@@ -17,6 +17,7 @@
 import { Component, HostListener } from "@angular/core";
 import { octaves } from "./note-frequencies";
 import { KeyValuePipe } from "@angular/common";
+import { RezonateCore, ResonanceConfig, HydiConfig } from "./rezonate-core";
 
 @Component({
   selector: 'app-keyboard',
@@ -42,14 +43,20 @@ export class KeyboardComponent {
   private oscillatorNode: OscillatorNode | null = null;
   private audioContext = new AudioContext()
   private mainGainNode = this.audioContext.createGain();
+  private rezonateCore!: RezonateCore;
 
   ngOnDestroy() {
+    this.rezonateCore.dispose();
     this.audioContext.close();
   }
 
   ngOnInit() {
     this.mainGainNode.connect(this.audioContext.destination);
     this.mainGainNode.gain.value = 0.5;
+
+    // Initialize Rezonate Core
+    this.rezonateCore = new RezonateCore(this.audioContext);
+    this.rezonateCore.connect(this.audioContext.destination);
   }
 
   playMelody(melody: [string, number, number][], start = 0) {
@@ -83,13 +90,30 @@ export class KeyboardComponent {
 
   private playTone(freq: number) {
     const osc = this.audioContext.createOscillator();
-    osc.connect(this.mainGainNode);
-    
+    osc.connect(this.rezonateCore.getNode());
+
     osc.type = 'triangle';
-  
+
     osc.frequency.value = freq;
     osc.start();
-  
+
     return osc;
+  }
+
+  // Public methods for external control
+  public setResonanceEnabled(enabled: boolean) {
+    this.rezonateCore.setResonanceEnabled(enabled);
+  }
+
+  public enableHydi(config: HydiConfig) {
+    this.rezonateCore.enableHydi(config);
+  }
+
+  public setMasterGain(gain: number) {
+    this.rezonateCore.setMasterGain(gain);
+  }
+
+  public updateResonanceConfig(config: ResonanceConfig, filterIndex: number = 0) {
+    this.rezonateCore.updateResonanceConfig(config, filterIndex);
   }
 }
