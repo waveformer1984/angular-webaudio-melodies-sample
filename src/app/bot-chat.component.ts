@@ -10,6 +10,8 @@ declare var webkitSpeechRecognition: any;
 export interface ChatMessage {
     sender: 'user' | 'bot';
     text: string;
+    options?: { id: string, text: string }[];
+    song?: any;
 }
 
 @Component({
@@ -25,6 +27,11 @@ export interface ChatMessage {
             <div class="chat-history">
                 <div *ngFor="let msg of messages" class="chat-message" [ngClass]="msg.sender">
                     <p>{{ msg.text }}</p>
+                    <div *ngIf="msg.options" class="chat-options">
+                        <button *ngFor="let option of msg.options" (click)="handleOptionClick(option)">
+                            {{ option.text }}
+                        </button>
+                    </div>
                 </div>
                 <div *ngIf="isBotTyping" class="chat-message bot typing">
                     <div class="dot"></div><div class="dot"></div><div class="dot"></div>
@@ -40,124 +47,34 @@ export interface ChatMessage {
         </div>
     `,
     styles: [`
-        .chat-popup {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 350px;
-            height: 450px;
-            background-color: var(--control-bg-color, #2c2c2e);
-            border: 1px solid var(--border-color, #444);
-            border-radius: 8px;
-            flex-direction: column;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            z-index: 1000;
-        }
-
-        .chat-header {
+        /* ... existing styles ... */
+        .chat-options {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            background-color: var(--secondary-color, #3a3a3c);
-            border-bottom: 1px solid var(--border-color, #444);
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
         }
 
-        .bot-nickname {
-            margin: 0;
-            color: var(--text-color, #fff);
-            font-weight: bold;
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            color: var(--text-color, #fff);
-            font-size: 1.5em;
-            cursor: pointer;
-        }
-
-        .chat-history {
-            flex-grow: 1;
-            padding: 10px;
-            overflow-y: auto;
-        }
-
-        .chat-message {
-            margin-bottom: 10px;
-        }
-
-        .chat-message.user p {
+        .chat-options button {
             background-color: var(--primary-color, #0a84ff);
             color: var(--button-text-color, #fff);
-            padding: 8px 12px;
             border-radius: 15px;
-            display: inline-block;
-            max-width: 80%;
-            text-align: left;
-        }
-
-        .chat-message.bot p {
-            background-color: var(--secondary-color, #3a3a3c);
             padding: 8px 12px;
-            border-radius: 15px;
-            display: inline-block;
-            max-width: 80%;
             text-align: left;
-        }
-
-        .chat-message.bot.typing .dot {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--text-color, #fff);
-            animation: typing 1s infinite;
-            margin: 0 2px;
-        }
-        
-        @keyframes typing {
-            0% { opacity: 0.2; }
-            20% { opacity: 1; }
-            100% { opacity: 0.2; }
-        }
-
-        .chat-input-area {
-            display: flex;
-            padding: 10px;
-            border-top: 1px solid var(--border-color, #444);
-        }
-
-        textarea {
-            flex-grow: 1;
-            resize: none;
-            background-color: var(--input-bg-color, #3a3a3c);
-            color: var(--input-text-color, #fff);
-            border: 1px solid var(--border-color, #444);
-            border-radius: 4px;
-        }
-
-        button {
-            margin-left: 8px;
-            background-color: var(--button-bg-color, #5a5a5c);
-            color: var(--button-text-color, #fff);
-            border: none;
-            border-radius: 4px;
             cursor: pointer;
-        }
-
-        .voice-btn.listening {
-            background-color: var(--accent-color, #ff9f0a);
         }
     `]
 })
 export class BotChatComponent implements OnInit, OnDestroy {
+    // ... (existing properties) ...
+    messages: ChatMessage[] = [];
+
+    // ... (constructor and other methods) ...
     @Input() botId!: string;
     @Input() botNickname: string = 'Rezonette Bot';
     @Input() isOpen: boolean = false;
     @Output() close = new EventEmitter<void>();
 
-    messages: ChatMessage[] = [];
     userInput: string = '';
     isBotTyping: boolean = false;
     isListening: boolean = false;
@@ -233,7 +150,12 @@ export class BotChatComponent implements OnInit, OnDestroy {
             history: history
         }).then(result => {
             this.isBotTyping = false;
-            const botMessage: ChatMessage = { sender: 'bot', text: result.response };
+            const botMessage: ChatMessage = {
+                sender: 'bot',
+                text: result.response,
+                options: result.options,
+                song: result.song
+            };
             this.messages.push(botMessage);
             this.speak(result.response);
         }).catch(err => {
@@ -242,6 +164,13 @@ export class BotChatComponent implements OnInit, OnDestroy {
         });
 
         this.userInput = '';
+    }
+
+    handleOptionClick(option: { id: string, text: string }) {
+        // We can handle the option action here, or send it back to the bot.
+        // For now, we'll just send the text back to the bot.
+        this.userInput = option.text;
+        this.sendMessage();
     }
 
     toggleVoiceRecognition() {
@@ -264,4 +193,5 @@ export class BotChatComponent implements OnInit, OnDestroy {
         this.isOpen = false;
         this.close.emit();
     }
+
 }
