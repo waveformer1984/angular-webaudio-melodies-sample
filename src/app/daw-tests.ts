@@ -69,6 +69,7 @@ export class DAWUnitTests {
     this.testDAWEngine();
     this.testProjectManager();
     this.testSynthesizer();
+    this.testLFO();
     this.testFileHandler();
     this.testAutomation();
     this.testAnalyzer();
@@ -128,20 +129,69 @@ export class DAWUnitTests {
     const rezonateCore = { getNode: () => audioContext.createGain() } as any;
     const synthesizer = new DAWSynthesizer(audioContext, rezonateCore);
 
-    // Test note on/off
+    // Test oscillator configuration
+    synthesizer.setOscillatorConfig(0, { type: 'sawtooth', frequency: 440, detune: 0, gain: 0.5, enabled: true });
+    const preset = synthesizer.getCurrentPreset();
+    this.assert(preset.oscillators[0].type === 'sawtooth', 'Oscillator type should be set');
+    this.assert(preset.oscillators[0].frequency === 440, 'Oscillator frequency should be set');
+    this.assert(preset.oscillators[0].detune === 0, 'Oscillator detune should be set');
+    this.assert(preset.oscillators[0].gain === 0.5, 'Oscillator gain should be set');
+    this.assert(preset.oscillators[0].enabled === true, 'Oscillator should be enabled');
+
+    // Test filter configuration
+    synthesizer.setFilterConfig({ type: 'lowpass', frequency: 1000, Q: 1, gain: 0 });
+    this.assert(preset.filter.type === 'lowpass', 'Filter type should be set');
+    this.assert(preset.filter.frequency === 1000, 'Filter frequency should be set');
+    this.assert(preset.filter.Q === 1, 'Filter Q should be set');
+    this.assert(preset.filter.gain === 0, 'Filter gain should be set');
+
+    // Test envelope configuration
+    synthesizer.setEnvelopeConfig({ attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.3 });
+    this.assert(preset.envelope.attack === 0.01, 'Envelope attack should be set');
+    this.assert(preset.envelope.decay === 0.1, 'Envelope decay should be set');
+    this.assert(preset.envelope.sustain === 0.8, 'Envelope sustain should be set');
+    this.assert(preset.envelope.release === 0.3, 'Envelope release should be set');
+
+    // Test note on/off with velocity
     const voiceId = synthesizer.noteOn(60, 100);
     this.assert(typeof voiceId === 'string', 'Note on should return voice ID');
     this.assert(synthesizer.getActiveVoices() === 1, 'Should have one active voice');
 
+    // Test note off
     synthesizer.noteOff(voiceId);
     // Note: voices are cleaned up asynchronously, so we can't test immediately
+
+    // Test polyphony limits and voice stealing
+    synthesizer.setPolyphony(2);
+    this.assert(synthesizer.getPolyphony() === 2, 'Polyphony should be set to 2');
+
+    const voiceId1 = synthesizer.noteOn(60, 100);
+    const voiceId2 = synthesizer.noteOn(64, 100);
+    const voiceId3 = synthesizer.noteOn(67, 100); // Should steal oldest voice
+    this.assert(synthesizer.getActiveVoices() === 2, 'Should have 2 active voices after polyphony limit');
+
+    synthesizer.noteOff(voiceId1);
+    synthesizer.noteOff(voiceId2);
+    synthesizer.noteOff(voiceId3);
+
+    // Test master gain
+    synthesizer.setMasterGain(0.5);
+    this.assert(synthesizer.getMasterGain() === 0.5, 'Master gain should be set');
 
     // Test preset loading
     const presets = synthesizer.getPresets();
     this.assert(presets.length > 0, 'Should have available presets');
+    this.assert(presets.includes('Basic Synth'), 'Should include Basic Synth preset');
+    this.assert(presets.includes('Warm Pad'), 'Should include Warm Pad preset');
+    this.assert(presets.includes('Brass'), 'Should include Brass preset');
 
-    const loaded = synthesizer.loadPreset(presets[0]);
-    this.assert(loaded, 'Preset should load successfully');
+    const loaded = synthesizer.loadPreset('Basic Synth');
+    this.assert(loaded, 'Basic Synth preset should load successfully');
+
+    // Test custom preset saving
+    synthesizer.savePreset('Test Preset');
+    const updatedPresets = synthesizer.getPresets();
+    this.assert(updatedPresets.includes('Test Preset'), 'Custom preset should be saved');
 
     audioContext.close();
   }
@@ -264,6 +314,41 @@ export class DAWUnitTests {
     audioContext.close();
   }
 
+  private testLFO(): void {
+    console.log('Testing LFO System...');
+
+    const audioContext = DAWTestUtils.createMockAudioContext();
+    const rezonateCore = { getNode: () => audioContext.createGain() } as any;
+    const synthesizer = new DAWSynthesizer(audioContext, rezonateCore);
+
+    // Test LFO configuration
+    synthesizer.setLFOConfig(0, { rate: 2, depth: 0.5, waveform: 'sine', enabled: true });
+    const preset = synthesizer.getCurrentPreset();
+    this.assert(preset.lfos[0].rate === 2, 'LFO rate should be set');
+    this.assert(preset.lfos[0].depth === 0.5, 'LFO depth should be set');
+    this.assert(preset.lfos[0].waveform === 'sine', 'LFO waveform should be set');
+    this.assert(preset.lfos[0].enabled === true, 'LFO should be enabled');
+
+    // Test modulation matrix
+    synthesizer.addModulationTarget({ parameter: 'oscillator_frequency', amount: 0.3, lfoIndex: 0 });
+    this.assert(preset.modulationMatrix.length === 1, 'Should have modulation target');
+    this.assert(preset.modulationMatrix[0].parameter === 'oscillator_frequency', 'Modulation parameter should be set');
+    this.assert(preset.modulationMatrix[0].amount === 0.3, 'Modulation amount should be set');
+    this.assert(preset.modulationMatrix[0].lfoIndex === 0, 'LFO index should be set');
+
+    // Test removing modulation target
+    synthesizer.removeModulationTarget(0);
+    this.assert(preset.modulationMatrix.length === 0, 'Modulation target should be removed');
+
+    // Test multiple LFOs
+    synthesizer.setLFOConfig(1, { rate: 0.5, depth: 0.8, waveform: 'triangle', enabled: true });
+    synthesizer.setLFOConfig(2, { rate: 4, depth: 0.2, waveform: 'square', enabled: false });
+    this.assert(preset.lfos[1].rate === 0.5, 'Second LFO rate should be set');
+    this.assert(preset.lfos[2].enabled === false, 'Third LFO should be disabled');
+
+    audioContext.close();
+  }
+
   private assert(condition: boolean, message: string): void {
     if (condition) {
       console.log(`✓ ${message}`);
@@ -296,6 +381,8 @@ export class DAWIntegrationTests {
     await this.testFullWorkflow();
     await this.testAudioProcessingChain();
     await this.testProjectPersistence();
+    await this.testSynthesizerIntegration();
+    await this.testErrorHandling();
   }
 
   private async testFullWorkflow(): Promise<void> {
@@ -393,6 +480,89 @@ export class DAWIntegrationTests {
     audioContext.close();
   }
 
+  private async testSynthesizerIntegration(): Promise<void> {
+    console.log('Testing Synthesizer Integration...');
+
+    const audioContext = DAWTestUtils.createMockAudioContext();
+    await DAWTestUtils.waitForAudioContext(audioContext);
+
+    const rezonateCore = { getNode: () => audioContext.createGain() } as any;
+    const synthesizer = new DAWSynthesizer(audioContext, rezonateCore);
+
+    // Test audio context integration
+    this.assert(audioContext.state === 'running', 'Audio context should be running');
+    this.assert(synthesizer.getMasterGain() >= 0 && synthesizer.getMasterGain() <= 1, 'Master gain should be valid');
+
+    // Test Web Audio API node connections
+    const masterGainNode = audioContext.createGain();
+    masterGainNode.connect(audioContext.destination);
+    this.assert(masterGainNode.numberOfOutputs === 1, 'Master gain node should have outputs');
+
+    // Test real-time audio processing
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    masterGainNode.connect(analyser);
+
+    // Generate some audio and check if it's processed
+    const voiceId = synthesizer.noteOn(60, 100);
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(dataArray);
+
+    // Check if there's any audio data (should be non-zero for active audio)
+    const hasAudio = dataArray.some(value => value > 0);
+    this.assert(hasAudio, 'Should detect audio output from synthesizer');
+
+    synthesizer.noteOff(voiceId);
+
+    audioContext.close();
+  }
+
+  private async testErrorHandling(): Promise<void> {
+    console.log('Testing Error Handling...');
+
+    const audioContext = DAWTestUtils.createMockAudioContext();
+    const rezonateCore = { getNode: () => audioContext.createGain() } as any;
+    const synthesizer = new DAWSynthesizer(audioContext, rezonateCore);
+
+    // Test invalid parameter values
+    synthesizer.setOscillatorConfig(10, { type: 'invalid' as any }); // Invalid index
+    synthesizer.setFilterConfig({ frequency: -100 }); // Invalid frequency
+    synthesizer.setEnvelopeConfig({ attack: -1 }); // Invalid attack time
+    synthesizer.setPolyphony(-5); // Invalid polyphony
+    synthesizer.setMasterGain(2); // Invalid gain > 1
+
+    // Should not crash and maintain valid state
+    this.assert(synthesizer.getPolyphony() >= 1, 'Polyphony should be valid after invalid input');
+    this.assert(synthesizer.getMasterGain() >= 0 && synthesizer.getMasterGain() <= 1, 'Master gain should be clamped');
+
+    // Test preset loading with invalid name
+    const loaded = synthesizer.loadPreset('NonExistentPreset');
+    this.assert(!loaded, 'Should not load invalid preset');
+
+    // Test modulation matrix boundary conditions
+    synthesizer.addModulationTarget({ parameter: 'invalid_param', amount: 2, lfoIndex: 10 }); // Invalid parameter and index
+    synthesizer.removeModulationTarget(100); // Invalid index
+
+    // Should not crash
+    this.assert(true, 'Should handle invalid modulation parameters gracefully');
+
+    // Test audio context state changes
+    await audioContext.suspend();
+    this.assert(audioContext.state === 'suspended', 'Audio context should be suspended');
+
+    // Try operations while suspended (should not crash)
+    synthesizer.noteOn(60, 100);
+    synthesizer.setMasterGain(0.5);
+
+    await audioContext.resume();
+    this.assert(audioContext.state === 'running', 'Audio context should be running again');
+
+    synthesizer.dispose();
+    audioContext.close();
+  }
+
   private assert(condition: boolean, message: string): void {
     if (condition) {
       console.log(`✓ ${message}`);
@@ -420,6 +590,8 @@ export class DAWPerformanceBenchmarks {
     await this.benchmarkAudioProcessing();
     await this.benchmarkProjectLoading();
     await this.benchmarkEffectProcessing();
+    await this.benchmarkSynthesizerStress();
+    await this.benchmark4HourSession();
   }
 
   private async benchmarkAudioProcessing(): Promise<void> {
@@ -526,6 +698,141 @@ export class DAWPerformanceBenchmarks {
     audioContext.close();
   }
 
+  private async benchmarkSynthesizerStress(): Promise<void> {
+    console.log('Benchmarking Synthesizer Stress Test...');
+
+    const audioContext = DAWTestUtils.createMockAudioContext();
+    await DAWTestUtils.waitForAudioContext(audioContext);
+
+    const rezonateCore = { getNode: () => audioContext.createGain() } as any;
+    const synthesizer = new DAWSynthesizer(audioContext, rezonateCore);
+    const monitor = new DAWPerformanceMonitor();
+
+    monitor.startMonitoring(audioContext);
+
+    const startTime = performance.now();
+    const testDuration = 10000; // 10 seconds
+    const endTime = startTime + testDuration;
+
+    let noteCount = 0;
+    let activeVoices = 0;
+
+    // Rapid note triggering stress test
+    while (performance.now() < endTime) {
+      // Trigger random notes rapidly
+      const note = Math.floor(Math.random() * 24) + 48; // C3 to C5
+      const velocity = Math.floor(Math.random() * 100) + 27; // 27-127
+
+      const voiceId = synthesizer.noteOn(note, velocity);
+      activeVoices = Math.max(activeVoices, synthesizer.getActiveVoices());
+      noteCount++;
+
+      // Random note off after short duration
+      setTimeout(() => {
+        synthesizer.noteOff(voiceId);
+      }, Math.random() * 200 + 50); // 50-250ms
+
+      // Small delay to prevent overwhelming
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    const totalTime = performance.now() - startTime;
+    const notesPerSecond = noteCount / (totalTime / 1000);
+
+    const metrics = monitor.getMetrics();
+
+    this.results.push({
+      name: 'Synthesizer Stress Test (10s rapid notes)',
+      duration: totalTime,
+      operationsPerSecond: notesPerSecond,
+      metadata: {
+        totalNotes: noteCount,
+        maxActiveVoices: activeVoices,
+        memoryUsage: metrics.currentMemoryUsage,
+        audioGlitches: metrics.audioGlitches
+      }
+    });
+
+    monitor.stopMonitoring();
+    synthesizer.dispose();
+    audioContext.close();
+  }
+
+  private async benchmark4HourSession(): Promise<void> {
+    console.log('Benchmarking 4-Hour Session Simulation...');
+
+    const audioContext = DAWTestUtils.createMockAudioContext();
+    await DAWTestUtils.waitForAudioContext(audioContext);
+
+    const rezonateCore = { getNode: () => audioContext.createGain() } as any;
+    const synthesizer = new DAWSynthesizer(audioContext, rezonateCore);
+    const monitor = new DAWPerformanceMonitor();
+
+    monitor.startMonitoring(audioContext);
+
+    const startTime = performance.now();
+    const sessionDuration = 4 * 60 * 60 * 1000; // 4 hours in milliseconds (scaled down for testing)
+    const scaledDuration = 30000; // 30 seconds for testing, represents 4 hours
+    const endTime = startTime + scaledDuration;
+
+    let totalNotes = 0;
+    let presetChanges = 0;
+    let memoryChecks = 0;
+
+    // Simulate 4-hour session with periodic activity
+    while (performance.now() < endTime) {
+      // Simulate user activity patterns
+      const activityType = Math.random();
+
+      if (activityType < 0.7) {
+        // Play notes (70% of activity)
+        const note = Math.floor(Math.random() * 36) + 36; // C2 to C5
+        const voiceId = synthesizer.noteOn(note, 80);
+        totalNotes++;
+
+        setTimeout(() => synthesizer.noteOff(voiceId), Math.random() * 1000 + 200);
+      } else if (activityType < 0.9) {
+        // Change presets (20% of activity)
+        const presets = synthesizer.getPresets();
+        const randomPreset = presets[Math.floor(Math.random() * presets.length)];
+        synthesizer.loadPreset(randomPreset);
+        presetChanges++;
+      } else {
+        // Check memory usage (10% of activity)
+        const metrics = monitor.getMetrics();
+        memoryChecks++;
+        // Log memory usage for monitoring
+        if (metrics.currentMemoryUsage > 100 * 1024 * 1024) { // 100MB
+          console.warn('High memory usage detected:', metrics.currentMemoryUsage);
+        }
+      }
+
+      // Wait between activities (simulate user think time)
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 100));
+    }
+
+    const totalTime = performance.now() - startTime;
+    const finalMetrics = monitor.getMetrics();
+
+    this.results.push({
+      name: '4-Hour Session Simulation',
+      duration: totalTime,
+      operationsPerSecond: (totalNotes + presetChanges) / (totalTime / 1000),
+      metadata: {
+        totalNotes,
+        presetChanges,
+        memoryChecks,
+        finalMemoryUsage: finalMetrics.currentMemoryUsage,
+        audioGlitches: finalMetrics.audioGlitches,
+        bufferUnderruns: finalMetrics.bufferUnderruns
+      }
+    });
+
+    monitor.stopMonitoring();
+    synthesizer.dispose();
+    audioContext.close();
+  }
+
   getResults(): BenchmarkResult[] {
     return this.results;
   }
@@ -608,6 +915,7 @@ export interface BenchmarkResult {
   name: string;
   duration: number;
   operationsPerSecond: number;
+  metadata?: any;
 }
 
 export interface TestReport {
