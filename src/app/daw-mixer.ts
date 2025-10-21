@@ -31,6 +31,7 @@ import { Track } from './daw-core';
         <div class="track-strip" *ngFor="let track of tracks; trackBy: trackByFn">
           <div class="track-header" [style.background-color]="track.color">
             <div class="track-name" [title]="track.name">{{ track.name }}</div>
+            <button class="delete-track-btn" (click)="deleteTrack(track.id)">X</button>
             <div class="track-type">{{ track.type.toUpperCase() }}</div>
           </div>
 
@@ -145,6 +146,23 @@ import { Track } from './daw-core';
       color: white;
       font-weight: bold;
       font-size: 0.9em;
+      position: relative;
+    }
+
+    .delete-track-btn {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background: rgba(0,0,0,0.4);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 20px;
+      text-align: center;
     }
 
     .track-name {
@@ -310,6 +328,7 @@ export class DAWMixerComponent {
   @Input() masterVolume = 0.8;
 
   @Output() trackUpdate = new EventEmitter<{trackId: string, updates: Partial<Track>}>();
+  @Output() trackDelete = new EventEmitter<string>();
   @Output() masterVolumeChange = new EventEmitter<number>();
   @Output() effectToggle = new EventEmitter<{trackId: string, effectId: string}>();
   @Output() addEffectToTrack = new EventEmitter<string>();
@@ -325,12 +344,16 @@ export class DAWMixerComponent {
     return effect.id;
   }
 
+  deleteTrack(trackId: string): void {
+    this.trackDelete.emit(trackId);
+  }
+
   toggleMute(trackId: string): void {
     const track = this.tracks.find(t => t.id === trackId);
     if (track) {
       this.trackUpdate.emit({
         trackId,
-        updates: { muted: !track.muted }
+        updates: { isMuted: !track.isMuted }
       });
     }
   }
@@ -340,7 +363,7 @@ export class DAWMixerComponent {
     if (track) {
       this.trackUpdate.emit({
         trackId,
-        updates: { solo: !track.solo }
+        updates: { isSolo: !track.isSolo }
       });
     }
   }
